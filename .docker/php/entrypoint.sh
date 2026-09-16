@@ -46,8 +46,8 @@ wait_for_service() {
   echo_success "✅ $name is available."
 }
 
-wait_for_service "MySQL" mysql 3306 30
-wait_for_service "Redis" redis 6379 30
+wait_for_service "MySQL" "${DB_HOST:-host.docker.internal}" "${DB_PORT:-13306}" 30
+wait_for_service "Redis" "${REDIS_HOST:-host.docker.internal}" "${REDIS_PORT:-16379}" 30
 
 # 正式开始
 echo_info "Starting container for SERVICE_NAME=$SERVICE_NAME..."
@@ -59,7 +59,18 @@ TARGET_DIR="${ROOT_PATH}/public"
 ENV_FILE="${ROOT_PATH}/.env"
 VENDOR_AUTOLOAD_FILE="${ROOT_PATH}/vendor/autoload.php"
 
-chown -R www-data:www-data $ROOT_PATH
+# Only application writable directories; database bind mounts must retain their owners.
+chown www-data:www-data "$ROOT_PATH"
+if [ -f "$ENV_FILE" ]; then
+    chown www-data:www-data "$ENV_FILE"
+fi
+for writable in storage bootstrap/cache public attachments bitbucket; do
+    if [ -d "$ROOT_PATH/$writable" ]; then
+        chown -R www-data:www-data "$ROOT_PATH/$writable"
+    fi
+done
+mkdir -p "${NP_BACKUP_EXPORT_PATH:-/tmp/nexusphp_backup}"
+chown www-data:www-data "${NP_BACKUP_EXPORT_PATH:-/tmp/nexusphp_backup}"
 
 if [ "$SERVICE_NAME" = "php" ]; then
     if [ ! -f "$ENV_FILE" ] || [ ! -f "$VENDOR_AUTOLOAD_FILE" ]; then
@@ -67,10 +78,8 @@ if [ "$SERVICE_NAME" = "php" ]; then
       cp -r "$SOURCE_DIR" "$TARGET_DIR"
       sed -i 's|LOG_FILE.*|LOG_FILE=php://stdout|g' "$ROOT_PATH/.env.example"
       if [ -f "$ENV_FILE" ]; then
-        echo_info "update LOG_FILE + DB_HOST + REDIS_HOST ..."
+        echo_info "update application log output ..."
         sed -i 's|LOG_FILE.*|LOG_FILE=php://stdout|g' "$ENV_FILE"
-        sed -i 's|DB_HOST.*|DB_HOST=mysql|g' "$ENV_FILE"
-        sed -i 's|REDIS_HOST.*|REDIS_HOST=redis|g' "$ENV_FILE"
       fi
     else
       echo_success ".env file: $ENV_FILE and vendor autoload file: $VENDOR_AUTOLOAD_FILE already exists, skip copy install file ..."

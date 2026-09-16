@@ -17,3 +17,12 @@ yarn-error.log
 /.history
 crowdin.yml
 .env.bak
+
+/.env.dev
+/mysql_data/
+/redis_data/
+/backup_data/
+
+/.env.prod
+
+/.deploy.lock

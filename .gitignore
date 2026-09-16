@@ -39,3 +39,12 @@ attachments
 bitbucket
 /public/attachments
 /public/bitbucket
+
+/.env.dev
+/mysql_data/
+/redis_data/
+/backup_data/
+
+/.env.prod
+
+/.deploy.lock

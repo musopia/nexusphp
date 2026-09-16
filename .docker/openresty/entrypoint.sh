@@ -68,8 +68,8 @@ echo_info "PHPMYADMIN_SERVER_NAME: ${PHPMYADMIN_SERVER_NAME}"
 # 生成配置
 APP_CONF="/etc/nginx/conf.d/app.conf"
 PMA_CONF="/etc/nginx/conf.d/phpmyadmin.conf"
-envsubst '$NP_DOMAIN' < /etc/nginx/conf.d/sites/app.conf.template > "$APP_CONF"
-envsubst '$PHPMYADMIN_SERVER_NAME' < /etc/nginx/conf.d/sites/phpmyadmin.conf.template > "$PMA_CONF"
+envsubst '$NP_DOMAIN $NP_PHP_PORT' < /etc/nginx/conf.d/sites/app.conf.template > "$APP_CONF"
+envsubst '$PHPMYADMIN_SERVER_NAME $NP_PMA_PORT' < /etc/nginx/conf.d/sites/phpmyadmin.conf.template > "$PMA_CONF"
 
 # if no certs, remove ssl configuration
 if [ "$USE_HTTPS" = "0" ]; then

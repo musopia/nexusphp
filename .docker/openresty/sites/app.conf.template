@@ -30,7 +30,7 @@ server {
             local filter = require("tracker_filter")
             filter()
         }
-        fastcgi_pass php:9000;
+        fastcgi_pass host.docker.internal:${NP_PHP_PORT};
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
@@ -38,7 +38,7 @@ server {
     }
 
     location ~ \.php$ {
-        fastcgi_pass php:9000;
+        fastcgi_pass host.docker.internal:${NP_PHP_PORT};
         fastcgi_index index.php;
         include fastcgi_params;
         fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
