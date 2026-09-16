@@ -102,3 +102,96 @@ details[open] summary {
 .hidden-text:hover {
     filter: blur(0);
 }
+
+/* Shoutbox @ mention */
+a.mention {
+    display: inline;
+    color: #b84a00;
+    background: #ffe8cc;
+    border-radius: 3px;
+    padding: 0 3px;
+    font-weight: 600;
+    text-decoration: none;
+}
+a.mention:hover {
+    text-decoration: underline;
+}
+a.mention.mention-self {
+    color: #7a2f00;
+    background: linear-gradient(180deg, #ffd48a, #ffb347);
+    box-shadow: inset 0 0 0 1px rgba(180, 90, 0, 0.35);
+    font-weight: 700;
+}
+a.mention.mention-self:hover {
+    filter: brightness(1.05);
+}
+.shout-composer {
+    position: relative;
+}
+.mention-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid #e0d2c0;
+    border-radius: 6px;
+    box-shadow: 0 10px 28px rgba(60, 30, 0, 0.14);
+    overflow: hidden;
+    z-index: 40;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.mention-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.mention-item:hover,
+.mention-item.active {
+    background: #fff1e0;
+}
+.mention-item .name {
+    font-weight: 650;
+}
+.mention-item .name mark {
+    background: transparent;
+    color: #d35400;
+    font-weight: 750;
+}
+.mention-item .meta {
+    color: #7a6a5a;
+    font-size: 12px;
+    flex: 0 0 auto;
+}
+.mention-item.is-self .name {
+    color: #7a2f00;
+}
+.mention-item.is-self .meta {
+    color: #a15c00;
+}
+.mention-empty {
+    padding: 12px;
+    color: #7a6a5a;
+    font-size: 13px;
+}
+.self-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    font-style: normal;
+    font-size: 11px;
+    line-height: 16px;
+    color: #7a2f00;
+    background: #ffd48a;
+    border-radius: 3px;
+}
