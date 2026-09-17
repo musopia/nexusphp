@@ -61,12 +61,17 @@ tar cf - -C "$root" \
   --exclude=./*.zip \
   . | tar xf - -C "$tree"
 
-# Windows 工作区默认 CRLF，直接打包会把 CR 带进 Linux 容器（sh 脚本会直接报错）
-changed=$(grep -rlI $'\r' "$tree" 2>/dev/null | wc -l | tr -d ' ')
+# Windows 工作区默认 CRLF，直接打包会把 CR 带进 Linux 容器（sh 脚本会直接报错）。
+# grep 无匹配时退出码为 1；在 set -Eeuo pipefail 下不能直接放进管道/命令替换，否则 CI 静默失败。
+crlf_list="$tmp/crlf.list"
+: >"$crlf_list"
+grep -rlI $'\r' "$tree" >"$crlf_list" 2>/dev/null || true
+changed=$(wc -l <"$crlf_list" | tr -d ' ')
 if [ "$changed" != "0" ]; then
-  grep -rlI $'\r' "$tree" 2>/dev/null | while IFS= read -r f; do
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
     sed -i 's/\r$//' "$f"
-  done
+  done <"$crlf_list"
 fi
 
 # 权限归一：目录 0755、文件 0644、脚本可执行（Windows 挂载点会全部报 0777）
