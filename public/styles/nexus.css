@@ -125,13 +125,16 @@ a.mention:hover {
     text-decoration: none;
 }
 a.mention.mention-self {
-    border-color: #d68910;
-    background: linear-gradient(180deg, #fad7a0, #f5b041);
-    color: #6e4009;
-    box-shadow: 0 0 0 1px rgba(241, 196, 15, 0.25);
+    background: #d64545;
+    border-color: #a93226;
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.28);
 }
 a.mention.mention-self:hover {
-    filter: brightness(1.05);
+    background: #c0392b;
+    border-color: #922b21;
+    color: #fff;
 }
 
 .shout-composer {
@@ -207,11 +210,16 @@ a.mention.mention-self:hover {
     font-size: 12px;
     flex: 0 0 auto;
 }
-.mention-item.is-self .name {
-    color: #8e2f0b;
+.mention-item.is-self {
+    background: #fff5f5;
 }
+.mention-item.is-self.active {
+    background: linear-gradient(90deg, #fdecea, #f5b7b1);
+    border-left-color: #c0392b;
+}
+.mention-item.is-self .name,
 .mention-item.is-self .meta {
-    color: #b85c00;
+    color: #c0392b;
 }
 .mention-empty {
     padding: 14px 12px;
@@ -222,12 +230,12 @@ a.mention.mention-self:hover {
 .self-tag {
     display: inline-block;
     margin-left: 6px;
-    padding: 0 5px;
+    padding: 1px 6px;
     font-style: normal;
     font-size: 11px;
     line-height: 16px;
-    color: #6e4009;
-    background: #f5c542;
+    color: #fff;
+    background: #e74c3c;
     border-radius: 3px;
-    font-weight: 700;
+    font-weight: 800;
 }

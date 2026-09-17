@@ -12,6 +12,24 @@
   var input = document.getElementById("shbox_text");
   if (!input) return;
 
+  // 1) Disable browser autofill / native suggestion popup
+  if (input.form) {
+    input.form.setAttribute("autocomplete", "off");
+  }
+  input.setAttribute("autocomplete", "off");
+  input.setAttribute("autocorrect", "off");
+  input.setAttribute("autocapitalize", "off");
+  input.setAttribute("spellcheck", "false");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("role", "combobox");
+  // Chrome often ignores autocomplete=off on remembered fields
+  input.addEventListener("focus", function () {
+    input.setAttribute("readonly", "readonly");
+    setTimeout(function () {
+      input.removeAttribute("readonly");
+    }, 0);
+  });
+
   // ---- critical styles (orange PT skin) ----
   var style = document.createElement("style");
   style.id = "shoutbox-mention-style";
@@ -19,10 +37,12 @@
     ".shout-composer{position:relative;}",
     "a.mention{display:inline-block;margin:0 1px;padding:0 5px;border:1px solid #f0b27a;border-radius:3px;background:#fdebd0;color:#b03a10;font-weight:700;font-size:12px;line-height:18px;text-decoration:none;}",
     "a.mention:hover{background:#fad7a0;border-color:#e67e22;color:#8e2f0b;text-decoration:none;}",
-    "a.mention.mention-self{border-color:#d68910;background:linear-gradient(180deg,#fad7a0,#f5b041);color:#6e4009;}",
+    "a.mention.mention-self{background:#d64545;border-color:#a93226;color:#fff;box-shadow:0 0 0 2px rgba(214,69,69,.28);font-weight:800;}",
+    "a.mention.mention-self:hover{background:#c0392b;border-color:#922b21;color:#fff;}",
     ".mention-panel{position:absolute;left:0;min-width:260px;max-width:420px;bottom:calc(100% + 8px);background:#fff;border:1px solid #e67e22;border-radius:6px;box-shadow:0 6px 20px rgba(180,90,20,.28);overflow:hidden;z-index:10050;text-align:left;font-family:inherit;}",
     ".mention-panel[hidden]{display:none!important;}",
     ".mention-panel-header{padding:6px 12px;font-size:12px;color:#8b5a2b;background:linear-gradient(90deg,#fff4e6,#ffe8cc);border-bottom:1px solid #f5d0a9;}",
+    ".mention-panel-header kbd{display:inline-block;min-width:1.2em;padding:0 3px;margin:0 1px;border:1px solid #d2b48c;border-bottom-width:2px;border-radius:3px;background:#fff;font-size:11px;text-align:center;}",
     ".mention-panel-body{max-height:220px;overflow-y:auto;}",
     ".mention-item{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;border:0;border-left:3px solid transparent;border-bottom:1px solid #f7efe6;background:#fff;font:inherit;color:#2b2118;text-align:left;cursor:pointer;}",
     ".mention-item:last-child{border-bottom:0;}",
@@ -31,9 +51,12 @@
     ".mention-item .name{font-weight:700;font-size:13px;color:#5c2e00;}",
     ".mention-item .name mark{background:transparent;color:#e67e22;font-weight:800;}",
     ".mention-item .meta{color:#9a7b5c;font-size:12px;flex:0 0 auto;}",
-    ".mention-item.is-self .name{color:#8e2f0b;}",
+    ".mention-item.is-self{background:#fff5f5;}",
+    ".mention-item.is-self.active{background:linear-gradient(90deg,#fdecea,#f5b7b1);border-left-color:#c0392b;}",
+    ".mention-item.is-self .name{color:#c0392b;}",
+    ".mention-item.is-self .meta{color:#c0392b;font-weight:700;}",
     ".mention-empty{padding:14px 12px;color:#9a7b5c;font-size:13px;background:#fffdf9;}",
-    ".self-tag{display:inline-block;margin-left:6px;padding:0 5px;font-style:normal;font-size:11px;line-height:16px;color:#6e4009;background:#f5c542;border-radius:3px;font-weight:700;}"
+    ".self-tag{display:inline-block;margin-left:6px;padding:1px 6px;font-style:normal;font-size:11px;line-height:16px;color:#fff;background:#e74c3c;border-radius:3px;font-weight:800;letter-spacing:.02em;}"
   ].join("\n");
   if (!document.getElementById("shoutbox-mention-style")) {
     document.head.appendChild(style);
@@ -53,7 +76,7 @@
   panel.hidden = true;
   panel.setAttribute("role", "listbox");
   panel.innerHTML =
-    '<div class="mention-panel-header">@ 提及 · <kbd>↑</kbd><kbd>↓</kbd> 选择 · <kbd>Enter</kbd> 确认</div>' +
+    '<div class="mention-panel-header">@ 提及 · <kbd>↑</kbd><kbd>↓</kbd> 选择 · <kbd>Tab</kbd>/<kbd>Enter</kbd> 确认</div>' +
     '<div class="mention-panel-body"></div>';
   var panelBody = panel.querySelector(".mention-panel-body");
   // Anchor to composer row; fallback to input parent
@@ -190,9 +213,15 @@
     });
   }
 
+  function setItems(list) {
+    state.items = list || [];
+    state.active = state.items.length ? 0 : -1;
+  }
+
   function renderPanel(prefix) {
     panelBody.innerHTML = "";
     if (!state.items.length) {
+      state.active = -1;
       panelBody.innerHTML =
         '<div class="mention-empty">' +
         (prefix.length >= MIN_PREFIX
@@ -202,6 +231,9 @@
       open();
       return;
     }
+    if (state.active < 0 || state.active >= state.items.length) {
+      state.active = 0;
+    }
     state.items.forEach(function (item, i) {
       var btn = document.createElement("button");
       btn.type = "button";
@@ -210,12 +242,13 @@
         (i === state.active ? " active" : "") +
         (item.self ? " is-self" : "");
       btn.setAttribute("role", "option");
+      btn.setAttribute("aria-selected", i === state.active ? "true" : "false");
       btn.innerHTML =
         '<span class="name">@' +
         markPrefix(item.username, prefix) +
         (item.self ? ' <em class="self-tag">本人</em>' : "") +
         '</span><span class="meta">' +
-        escapeHtml(item.meta) +
+        escapeHtml(item.self ? "你自己 · Enter/Tab" : item.meta) +
         "</span>";
       btn.addEventListener("mousedown", function (e) {
         e.preventDefault();
@@ -267,7 +300,7 @@
   function searchRemote(prefix) {
     var key = prefix.toLowerCase();
     if (state.cache[key]) {
-      state.items = merge(filterLocal(prefix), state.cache[key]);
+      setItems(merge(filterLocal(prefix), state.cache[key]));
       renderPanel(prefix);
       return;
     }
@@ -276,7 +309,7 @@
       if (seq !== state.reqSeq) return;
       var list = data || [];
       state.cache[key] = list;
-      state.items = merge(filterLocal(prefix), list);
+      setItems(merge(filterLocal(prefix), list));
       renderPanel(prefix);
     });
   }
@@ -288,13 +321,13 @@
 
     if (prefix.length < MIN_PREFIX) {
       ensureRecent(function () {
-        state.items = merge(filterLocal(prefix), []);
+        setItems(merge(filterLocal(prefix), []));
         renderPanel(prefix);
       });
       return;
     }
 
-    state.items = merge(filterLocal(prefix), []);
+    setItems(merge(filterLocal(prefix), []));
     renderPanel(prefix);
     state.timer = setTimeout(function () {
       searchRemote(prefix);
@@ -317,32 +350,38 @@
 
   function onKeydown(e) {
     if (!state.open) return;
-    if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown" || e.keyCode === 40) {
       e.preventDefault();
       if (!state.items.length) return;
-      state.active = (state.active + 1) % state.items.length;
+      if (state.active < 0) state.active = 0;
+      else state.active = (state.active + 1) % state.items.length;
       renderPanel(currentPrefix());
       return;
     }
-    if (e.key === "ArrowUp") {
+    if (e.key === "ArrowUp" || e.keyCode === 38) {
       e.preventDefault();
       if (!state.items.length) return;
-      state.active =
-        (state.active - 1 + state.items.length) % state.items.length;
+      if (state.active < 0) state.active = state.items.length - 1;
+      else state.active = (state.active - 1 + state.items.length) % state.items.length;
       renderPanel(currentPrefix());
       return;
     }
-    if (e.key === "Enter" || e.key === "Tab") {
+    // Tab / Enter: pick current (default first) item
+    if (e.key === "Tab" || e.keyCode === 9 || e.key === "Enter" || e.keyCode === 13) {
       if (state.items.length) {
         e.preventDefault();
-        insert(state.items[state.active]);
-      } else if (e.key === "Enter") {
+        var idx = state.active >= 0 ? state.active : 0;
+        insert(state.items[idx]);
+      } else if (e.key === "Enter" || e.keyCode === 13) {
         e.preventDefault();
+        close();
+      } else if (e.key === "Tab" || e.keyCode === 9) {
+        // empty panel: allow normal focus move
         close();
       }
       return;
     }
-    if (e.key === "Escape") {
+    if (e.key === "Escape" || e.keyCode === 27) {
       e.preventDefault();
       close();
     }
@@ -350,6 +389,12 @@
 
   input.addEventListener("input", onInput);
   input.addEventListener("keydown", onKeydown);
+  // stop browser from navigating on Tab if panel handled it
+  input.addEventListener("keyup", function (e) {
+    if (state.open && (e.key === "Tab" || e.keyCode === 9)) {
+      e.preventDefault();
+    }
+  });
   input.addEventListener("blur", function () {
     setTimeout(close, 150);
   });
