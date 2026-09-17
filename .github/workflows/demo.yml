@@ -1,7 +1,11 @@
 name: deploy to demo site
-#on:
-#  push:
-#    branches: [ "php8" ]
+
+# 仅手动触发：不再随 push 自动发布到 demo 站。
+# 注意：`on:` 整段被注释掉会让工作流文件无效，GitHub 会报
+# "No event triggers defined in `on`" 并产生一个失败的运行记录，
+# 所以这里保留一个只允许手动触发的触发器。
+on:
+  workflow_dispatch:
 
 # Environment variables available to all jobs and steps in this workflow
 env:

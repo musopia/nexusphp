@@ -1,0 +1,96 @@
+name: Deploy Dev
+
+# 仅手动触发：打包当前 ref 的代码 → 上传服务器 → 备份并部署
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "要部署的 git ref（分支 / tag / commit）"
+        required: true
+        default: "dev"
+      run_install:
+        description: "是否执行 auto-install（幂等，已装则跳过）"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+# 同一时间只允许一个 dev 发布
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Package and deploy to dev server
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+      SSH_USER: ${{ secrets.DEPLOY_USER }}
+      SSH_KEY: ${{ secrets.DEPLOY_KEY }}
+      SSH_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
+      REMOTE_PACKAGE_DIR: /opt/nexusphp-packages
+      REMOTE_RUNNER: /opt/nexusphp-deploy/deploy.sh
+      DEPLOY_REF: ${{ github.event.inputs.ref || 'dev' }}
+      RUN_INSTALL: ${{ github.event.inputs.run_install || 'true' }}
+      MODE: dev
+      ADMIN_USERNAME: ${{ vars.DEV_ADMIN_USERNAME || 'admin' }}
+      ADMIN_EMAIL: ${{ vars.DEV_ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.DEV_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || 'dev' }}
+          fetch-depth: 1
+
+      - name: Package code
+        run: |
+          set -Eeuo pipefail
+          bash scripts/package.sh "nexusphp-${GITHUB_SHA}.tar.gz" "$DEPLOY_REF"
+          echo "PKG_NAME=nexusphp-${GITHUB_SHA}.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Upload package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: ${{ env.SSH_PORT }}
+          source: ${{ env.PKG_NAME }}
+          target: /opt/nexusphp-packages
+          timeout: 180s
+
+      - name: Backup and deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          port: ${{ env.SSH_PORT }}
+          shell: bash
+          envs: DEPLOY_REF,RUN_INSTALL,MODE,ADMIN_USERNAME,ADMIN_EMAIL,ADMIN_PASSWORD,PKG_NAME
+          script: |
+            set -Eeuo pipefail
+            PKG="$REMOTE_PACKAGE_DIR/$PKG_NAME"
+            [ -f "$PKG" ] || { echo "上传的代码包不存在: $PKG" >&2; exit 1; }
+            echo ">> package: $PKG ($(du -h "$PKG" | cut -f1))"
+
+            # 全新服务器（或被清理过）：先从代码包安装部署脚本
+            if [ ! -x "$REMOTE_RUNNER" ]; then
+              echo ">> 首次部署：从代码包 bootstrap 部署脚本"
+              rm -rf /tmp/nexusphp-boot
+              mkdir -p /tmp/nexusphp-boot
+              tar xzf "$PKG" -C /tmp/nexusphp-boot ./scripts ./docker-compose.yml
+              bash /tmp/nexusphp-boot/scripts/bootstrap-dev.sh "$PKG" --runner "$REMOTE_RUNNER"
+            fi
+
+            echo ">> deploy ref=$DEPLOY_REF run_install=$RUN_INSTALL"
+            RUN_INSTALL="$RUN_INSTALL" MODE="$MODE" \
+              ADMIN_USERNAME="$ADMIN_USERNAME" \
+              ADMIN_EMAIL="${ADMIN_EMAIL:-$ADMIN_USERNAME@example.com}" \
+              ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+              "$REMOTE_RUNNER" "$PKG" "$DEPLOY_REF"
