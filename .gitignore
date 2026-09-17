@@ -37,7 +37,10 @@ update.lock
 .env.bak
 .env-dev
 .deploy-dev.env
-/deploy
+/deploy/*
+!/deploy/env.dev
+!/deploy/id_rsa_ci
+!/deploy/id_rsa_ci.pub
 /nexusphp-*.tar.gz
 /.deployed-*
 attachments

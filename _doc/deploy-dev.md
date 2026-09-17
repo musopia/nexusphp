@@ -67,21 +67,23 @@ SSH_HOST=你的服务器IP
 
 ## CI 配置
 
-- secrets：`DEPLOY_HOST`、`DEPLOY_USER`、`DEPLOY_KEY`、`DEPLOY_PORT`（可选）、`DEV_ADMIN_PASSWORD`（可选）
-- vars：`DEV_ADMIN_USERNAME`、`DEV_ADMIN_EMAIL`（可选，默认 `admin` / `admin@example.com`）
+- 连接信息：`deploy/env.dev`（host / user / port / 私钥路径 / 远端目录）
+- SSH 私钥：`deploy/id_rsa_ci`（对应公钥已加到服务器 `/root/.ssh/authorized_keys`）
+- **不需要任何 GitHub secrets / variables**，点一次 `Deploy Dev` 即可
+- 触发：Actions → `Deploy Dev` → Run workflow（`ref` 默认 `dev`、`run_install` 默认 true）
 
-未提供 `DEV_ADMIN_PASSWORD` 时，auto-install 会生成随机管理员密码并打印在部署日志里。
+未设置 `ADMIN_PASSWORD` 时，auto-install 会生成随机管理员密码并打印在部署日志里。
 
 ### 部署密钥
 
-CI 用一把专用、无 passphrase 的 ed25519 key 登录服务器：公钥追加在服务器的
-`/root/.ssh/authorized_keys`，私钥只有两份——
+`deploy/env.dev`、`deploy/id_rsa_ci`、`deploy/id_rsa_ci.pub` 都随仓库提交
+（`.gitignore` 里 `/deploy/*` 只放行这三个文件）。
 
-- 本地 `deploy/id_rsa_ci`（`/deploy` 已被 `.gitignore` 忽略，不要提交，仓库是公开的）
-- GitHub repo secret `DEPLOY_KEY`
+**注意：仓库是公开的，私钥等同公开凭据**，这把 key 只用于 dev 服务器，不要复用到 prod
+或其它机器；prod 建议单独用一把受限 key（`authorized_keys` 里加 `restrict,command=`）。
 
-轮换或撤销：生成新 keypair → 公钥追加到服务器 `authorized_keys` → 更新 `DEPLOY_KEY`
-→ 从 `authorized_keys` 删掉旧公钥那一行。改 `authorized_keys` 前先备份：
+轮换或撤销：生成新 keypair → 公钥追加到服务器 `authorized_keys` → 提交新的
+`deploy/id_rsa_ci` → 从 `authorized_keys` 删掉旧公钥那一行。改之前先备份：
 
 ```bash
 cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak.$(date +%F-%H%M%S)
