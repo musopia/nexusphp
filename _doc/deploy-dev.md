@@ -71,3 +71,18 @@ SSH_HOST=你的服务器IP
 - vars：`DEV_ADMIN_USERNAME`、`DEV_ADMIN_EMAIL`（可选，默认 `admin` / `admin@example.com`）
 
 未提供 `DEV_ADMIN_PASSWORD` 时，auto-install 会生成随机管理员密码并打印在部署日志里。
+
+### 部署密钥
+
+CI 用一把专用、无 passphrase 的 ed25519 key 登录服务器：公钥追加在服务器的
+`/root/.ssh/authorized_keys`，私钥只有两份——
+
+- 本地 `deploy/id_rsa_ci`（`/deploy` 已被 `.gitignore` 忽略，不要提交，仓库是公开的）
+- GitHub repo secret `DEPLOY_KEY`
+
+轮换或撤销：生成新 keypair → 公钥追加到服务器 `authorized_keys` → 更新 `DEPLOY_KEY`
+→ 从 `authorized_keys` 删掉旧公钥那一行。改 `authorized_keys` 前先备份：
+
+```bash
+cp -a /root/.ssh/authorized_keys /root/.ssh/authorized_keys.bak.$(date +%F-%H%M%S)
+```
