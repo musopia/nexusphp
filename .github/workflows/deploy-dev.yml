@@ -1,6 +1,8 @@
 name: Deploy Dev
 
-# 仅手动触发：打包当前 ref 的代码 → 上传服务器 → 备份并部署
+# 手动触发：打包指定 ref 的代码 -> 上传服务器 -> 备份并部署。
+# 零 GitHub secrets / variables：连接信息在 deploy/env.dev，SSH 私钥在 deploy/id_rsa_ci。
+# 警告：本仓库是公开的，deploy/id_rsa_ci 等同于公开凭据，只能用于这台 dev 服务器。
 on:
   workflow_dispatch:
     inputs:
@@ -22,24 +24,13 @@ concurrency:
   group: deploy-dev
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Package and deploy to dev server
     runs-on: ubuntu-latest
-    environment: dev
-    env:
-      SSH_HOST: ${{ secrets.DEPLOY_HOST }}
-      SSH_USER: ${{ secrets.DEPLOY_USER }}
-      SSH_KEY: ${{ secrets.DEPLOY_KEY }}
-      SSH_PORT: ${{ secrets.DEPLOY_PORT || 22 }}
-      REMOTE_PACKAGE_DIR: /opt/nexusphp-packages
-      REMOTE_RUNNER: /opt/nexusphp-deploy/deploy.sh
-      DEPLOY_REF: ${{ github.event.inputs.ref || 'dev' }}
-      RUN_INSTALL: ${{ github.event.inputs.run_install || 'true' }}
-      MODE: dev
-      ADMIN_USERNAME: ${{ vars.DEV_ADMIN_USERNAME || 'admin' }}
-      ADMIN_EMAIL: ${{ vars.DEV_ADMIN_EMAIL }}
-      ADMIN_PASSWORD: ${{ secrets.DEV_ADMIN_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,50 +38,76 @@ jobs:
           ref: ${{ github.event.inputs.ref || 'dev' }}
           fetch-depth: 1
 
+      - name: Load deploy env
+        run: |
+          set -Eeuo pipefail
+          envfile=deploy/env.dev
+          [ -f "$envfile" ] || { echo "::error::缺少 $envfile"; exit 1; }
+          set -a
+          . "$envfile"
+          set +a
+          : "${DEPLOY_HOST:?deploy/env.dev 缺少 DEPLOY_HOST}"
+          : "${DEPLOY_KEY_FILE:?deploy/env.dev 缺少 DEPLOY_KEY_FILE}"
+          [ -f "$DEPLOY_KEY_FILE" ] || { echo "::error::找不到私钥 $DEPLOY_KEY_FILE"; exit 1; }
+          echo "DEPLOY_HOST=$DEPLOY_HOST" >> "$GITHUB_ENV"
+          echo "DEPLOY_USER=${DEPLOY_USER:-root}" >> "$GITHUB_ENV"
+          echo "DEPLOY_PORT=${DEPLOY_PORT:-22}" >> "$GITHUB_ENV"
+          echo "DEPLOY_KEY_FILE=$DEPLOY_KEY_FILE" >> "$GITHUB_ENV"
+          echo "REMOTE_PACKAGE_DIR=${REMOTE_PACKAGE_DIR:-/opt/nexusphp-packages}" >> "$GITHUB_ENV"
+          echo "REMOTE_RUNNER=${REMOTE_RUNNER:-/opt/nexusphp-deploy/deploy.sh}" >> "$GITHUB_ENV"
+          echo "MODE=${MODE:-dev}" >> "$GITHUB_ENV"
+          echo "SYNC_ENV=${SYNC_ENV:-false}" >> "$GITHUB_ENV"
+          echo "ADMIN_USERNAME=${ADMIN_USERNAME:-admin}" >> "$GITHUB_ENV"
+          echo "ADMIN_EMAIL=${ADMIN_EMAIL:-}" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=${ADMIN_PASSWORD:-}" >> "$GITHUB_ENV"
+          echo "DEPLOY_REF=${{ github.event.inputs.ref || 'dev' }}" >> "$GITHUB_ENV"
+          echo "RUN_INSTALL=${{ github.event.inputs.run_install || 'true' }}" >> "$GITHUB_ENV"
+
       - name: Package code
         run: |
           set -Eeuo pipefail
-          bash scripts/package.sh "nexusphp-${GITHUB_SHA}.tar.gz" "$DEPLOY_REF"
-          echo "PKG_NAME=nexusphp-${GITHUB_SHA}.tar.gz" >> "$GITHUB_ENV"
+          pkg="nexusphp-${GITHUB_SHA}.tar.gz"
+          bash scripts/package.sh "$pkg" "$DEPLOY_REF"
+          echo "PKG_NAME=$pkg" >> "$GITHUB_ENV"
+
+      - name: Prepare SSH key
+        run: |
+          set -Eeuo pipefail
+          key="$RUNNER_TEMP/deploy_key"
+          install -m 600 "$DEPLOY_KEY_FILE" "$key"
+          known_hosts="$RUNNER_TEMP/known_hosts"
+          echo "SSH_CMD=ssh -i $key -p $DEPLOY_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$known_hosts" >> "$GITHUB_ENV"
+          echo "SCP_CMD=scp -i $key -P $DEPLOY_PORT -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=$known_hosts" >> "$GITHUB_ENV"
 
       - name: Upload package
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USER }}
-          key: ${{ env.SSH_KEY }}
-          port: ${{ env.SSH_PORT }}
-          source: ${{ env.PKG_NAME }}
-          target: /opt/nexusphp-packages
-          timeout: 180s
+        run: |
+          set -Eeuo pipefail
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          $SSH_CMD "$target" "mkdir -p '$REMOTE_PACKAGE_DIR'"
+          $SCP_CMD "$PKG_NAME" "$target:$REMOTE_PACKAGE_DIR/"
 
       - name: Backup and deploy
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ env.SSH_HOST }}
-          username: ${{ env.SSH_USER }}
-          key: ${{ env.SSH_KEY }}
-          port: ${{ env.SSH_PORT }}
-          shell: bash
-          envs: DEPLOY_REF,RUN_INSTALL,MODE,ADMIN_USERNAME,ADMIN_EMAIL,ADMIN_PASSWORD,PKG_NAME
-          script: |
-            set -Eeuo pipefail
-            PKG="$REMOTE_PACKAGE_DIR/$PKG_NAME"
-            [ -f "$PKG" ] || { echo "上传的代码包不存在: $PKG" >&2; exit 1; }
-            echo ">> package: $PKG ($(du -h "$PKG" | cut -f1))"
-
-            # 全新服务器（或被清理过）：先从代码包安装部署脚本
-            if [ ! -x "$REMOTE_RUNNER" ]; then
-              echo ">> 首次部署：从代码包 bootstrap 部署脚本"
-              rm -rf /tmp/nexusphp-boot
-              mkdir -p /tmp/nexusphp-boot
-              tar xzf "$PKG" -C /tmp/nexusphp-boot ./scripts ./docker-compose.yml
-              bash /tmp/nexusphp-boot/scripts/bootstrap-dev.sh "$PKG" --runner "$REMOTE_RUNNER"
-            fi
-
-            echo ">> deploy ref=$DEPLOY_REF run_install=$RUN_INSTALL"
-            RUN_INSTALL="$RUN_INSTALL" MODE="$MODE" \
-              ADMIN_USERNAME="$ADMIN_USERNAME" \
-              ADMIN_EMAIL="${ADMIN_EMAIL:-$ADMIN_USERNAME@example.com}" \
-              ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-              "$REMOTE_RUNNER" "$PKG" "$DEPLOY_REF"
+        run: |
+          set -Eeuo pipefail
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          admin_password_q=$(printf '%q' "${ADMIN_PASSWORD:-}")
+          $SSH_CMD "$target" bash -s <<REMOTE
+          set -Eeuo pipefail
+          PKG="$REMOTE_PACKAGE_DIR/$PKG_NAME"
+          RUNNER="$REMOTE_RUNNER"
+          [ -f "\$PKG" ] || { echo "上传的代码包不存在: \$PKG" >&2; exit 1; }
+          echo ">> package: \$PKG (\$(du -h "\$PKG" | cut -f1))"
+          if [ ! -x "\$RUNNER" ]; then
+            echo ">> 首次部署：从代码包 bootstrap 部署脚本"
+            boot=\$(mktemp -d)
+            tar xzf "\$PKG" -C "\$boot" ./scripts ./docker-compose.yml
+            bash "\$boot/scripts/bootstrap-dev.sh" "\$PKG" --runner "\$RUNNER"
+            rm -rf "\$boot"
+          fi
+          echo ">> deploy ref=$DEPLOY_REF run_install=$RUN_INSTALL"
+          RUN_INSTALL="$RUN_INSTALL" MODE="$MODE" SYNC_ENV="$SYNC_ENV" \
+            ADMIN_USERNAME="${ADMIN_USERNAME:-admin}" \
+            ADMIN_EMAIL="${ADMIN_EMAIL:-}" \
+            ADMIN_PASSWORD=$admin_password_q \
+            "\$RUNNER" "\$PKG" "$DEPLOY_REF"
+          REMOTE
