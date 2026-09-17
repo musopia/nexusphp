@@ -35,6 +35,11 @@ crowdin.yml
 install.lock
 update.lock
 .env.bak
+.env-dev
+.deploy-dev.env
+/deploy
+/nexusphp-*.tar.gz
+/.deployed-*
 attachments
 bitbucket
 /public/attachments

@@ -1,4 +1,6 @@
 * text=auto
+# shell 脚本（含 .docker 下的 entrypoint）必须保持 LF，否则 Linux/容器里执行会报错
+*.sh text eol=lf
 *.css linguist-vendored
 *.scss linguist-vendored
 *.js linguist-vendored
