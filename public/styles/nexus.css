@@ -103,95 +103,131 @@ details[open] summary {
     filter: blur(0);
 }
 
-/* Shoutbox @ mention */
+/* Shoutbox @ mention — aligned with orange PT skin */
 a.mention {
-    display: inline;
-    color: #b84a00;
-    background: #ffe8cc;
+    display: inline-block;
+    margin: 0 1px;
+    padding: 0 5px;
+    border: 1px solid #f0b27a;
     border-radius: 3px;
-    padding: 0 3px;
-    font-weight: 600;
+    background: #fdebd0;
+    color: #b03a10;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 18px;
     text-decoration: none;
+    vertical-align: baseline;
 }
 a.mention:hover {
-    text-decoration: underline;
+    background: #fad7a0;
+    border-color: #e67e22;
+    color: #8e2f0b;
+    text-decoration: none;
 }
 a.mention.mention-self {
-    color: #7a2f00;
-    background: linear-gradient(180deg, #ffd48a, #ffb347);
-    box-shadow: inset 0 0 0 1px rgba(180, 90, 0, 0.35);
-    font-weight: 700;
+    border-color: #d68910;
+    background: linear-gradient(180deg, #fad7a0, #f5b041);
+    color: #6e4009;
+    box-shadow: 0 0 0 1px rgba(241, 196, 15, 0.25);
 }
 a.mention.mention-self:hover {
     filter: brightness(1.05);
 }
+
 .shout-composer {
     position: relative;
 }
+
 .mention-panel {
     position: absolute;
     left: 0;
-    right: 0;
-    bottom: calc(100% + 6px);
+    min-width: 260px;
+    max-width: 420px;
+    bottom: calc(100% + 8px);
     background: #fff;
-    border: 1px solid #e0d2c0;
+    border: 1px solid #e67e22;
     border-radius: 6px;
-    box-shadow: 0 10px 28px rgba(60, 30, 0, 0.14);
+    box-shadow: 0 6px 20px rgba(180, 90, 20, 0.28);
     overflow: hidden;
-    z-index: 40;
-    max-height: 240px;
+    z-index: 10050;
+    text-align: left;
+}
+.mention-panel[hidden] {
+    display: none !important;
+}
+.mention-panel-header {
+    padding: 6px 12px;
+    font-size: 12px;
+    color: #8b5a2b;
+    background: linear-gradient(90deg, #fff4e6, #ffe8cc);
+    border-bottom: 1px solid #f5d0a9;
+}
+.mention-panel-body {
+    max-height: 220px;
     overflow-y: auto;
 }
 .mention-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 12px;
     width: 100%;
-    padding: 7px 10px;
+    padding: 9px 12px;
     border: 0;
-    background: transparent;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid #f7efe6;
+    background: #fff;
     font: inherit;
-    color: inherit;
+    color: #2b2118;
     text-align: left;
     cursor: pointer;
 }
-.mention-item:hover,
+.mention-item:last-child {
+    border-bottom: 0;
+}
+.mention-item:hover {
+    background: #fff8ef;
+}
 .mention-item.active {
-    background: #fff1e0;
+    background: linear-gradient(90deg, #fff1e0, #ffe4c4);
+    border-left-color: #e67e22;
 }
 .mention-item .name {
-    font-weight: 650;
+    font-weight: 700;
+    font-size: 13px;
+    color: #5c2e00;
 }
 .mention-item .name mark {
     background: transparent;
-    color: #d35400;
-    font-weight: 750;
+    color: #e67e22;
+    font-weight: 800;
 }
 .mention-item .meta {
-    color: #7a6a5a;
+    color: #9a7b5c;
     font-size: 12px;
     flex: 0 0 auto;
 }
 .mention-item.is-self .name {
-    color: #7a2f00;
+    color: #8e2f0b;
 }
 .mention-item.is-self .meta {
-    color: #a15c00;
+    color: #b85c00;
 }
 .mention-empty {
-    padding: 12px;
-    color: #7a6a5a;
+    padding: 14px 12px;
+    color: #9a7b5c;
     font-size: 13px;
+    background: #fffdf9;
 }
 .self-tag {
     display: inline-block;
-    margin-left: 4px;
-    padding: 0 4px;
+    margin-left: 6px;
+    padding: 0 5px;
     font-style: normal;
     font-size: 11px;
     line-height: 16px;
-    color: #7a2f00;
-    background: #ffd48a;
+    color: #6e4009;
+    background: #f5c542;
     border-radius: 3px;
+    font-weight: 700;
 }

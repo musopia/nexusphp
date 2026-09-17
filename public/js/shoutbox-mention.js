@@ -1,6 +1,7 @@
 /**
  * Homepage shoutbox @ mention autocomplete.
  * Rules: local recent speakers → 1 char local only → ≥2 chars debounce prefix search.
+ * Styles injected to avoid stale CSS; panel anchored to input box.
  */
 (function () {
   "use strict";
@@ -10,6 +11,33 @@
 
   var input = document.getElementById("shbox_text");
   if (!input) return;
+
+  // ---- critical styles (orange PT skin) ----
+  var style = document.createElement("style");
+  style.id = "shoutbox-mention-style";
+  style.textContent = [
+    ".shout-composer{position:relative;}",
+    "a.mention{display:inline-block;margin:0 1px;padding:0 5px;border:1px solid #f0b27a;border-radius:3px;background:#fdebd0;color:#b03a10;font-weight:700;font-size:12px;line-height:18px;text-decoration:none;}",
+    "a.mention:hover{background:#fad7a0;border-color:#e67e22;color:#8e2f0b;text-decoration:none;}",
+    "a.mention.mention-self{border-color:#d68910;background:linear-gradient(180deg,#fad7a0,#f5b041);color:#6e4009;}",
+    ".mention-panel{position:absolute;left:0;min-width:260px;max-width:420px;bottom:calc(100% + 8px);background:#fff;border:1px solid #e67e22;border-radius:6px;box-shadow:0 6px 20px rgba(180,90,20,.28);overflow:hidden;z-index:10050;text-align:left;font-family:inherit;}",
+    ".mention-panel[hidden]{display:none!important;}",
+    ".mention-panel-header{padding:6px 12px;font-size:12px;color:#8b5a2b;background:linear-gradient(90deg,#fff4e6,#ffe8cc);border-bottom:1px solid #f5d0a9;}",
+    ".mention-panel-body{max-height:220px;overflow-y:auto;}",
+    ".mention-item{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;padding:9px 12px;border:0;border-left:3px solid transparent;border-bottom:1px solid #f7efe6;background:#fff;font:inherit;color:#2b2118;text-align:left;cursor:pointer;}",
+    ".mention-item:last-child{border-bottom:0;}",
+    ".mention-item:hover{background:#fff8ef;}",
+    ".mention-item.active{background:linear-gradient(90deg,#fff1e0,#ffe4c4);border-left-color:#e67e22;}",
+    ".mention-item .name{font-weight:700;font-size:13px;color:#5c2e00;}",
+    ".mention-item .name mark{background:transparent;color:#e67e22;font-weight:800;}",
+    ".mention-item .meta{color:#9a7b5c;font-size:12px;flex:0 0 auto;}",
+    ".mention-item.is-self .name{color:#8e2f0b;}",
+    ".mention-empty{padding:14px 12px;color:#9a7b5c;font-size:13px;background:#fffdf9;}",
+    ".self-tag{display:inline-block;margin-left:6px;padding:0 5px;font-style:normal;font-size:11px;line-height:16px;color:#6e4009;background:#f5c542;border-radius:3px;font-weight:700;}"
+  ].join("\n");
+  if (!document.getElementById("shoutbox-mention-style")) {
+    document.head.appendChild(style);
+  }
 
   var wrap = input.closest(".shout-composer") || input.parentNode;
   if (wrap && !wrap.classList.contains("shout-composer")) {
@@ -24,7 +52,18 @@
   panel.className = "mention-panel";
   panel.hidden = true;
   panel.setAttribute("role", "listbox");
-  if (wrap) wrap.appendChild(panel);
+  panel.innerHTML =
+    '<div class="mention-panel-header">@ 提及 · <kbd>↑</kbd><kbd>↓</kbd> 选择 · <kbd>Enter</kbd> 确认</div>' +
+    '<div class="mention-panel-body"></div>';
+  var panelBody = panel.querySelector(".mention-panel-body");
+  // Anchor to composer row; fallback to input parent
+  var anchor = wrap || input.parentNode;
+  if (anchor) {
+    if (window.getComputedStyle(anchor).position === "static") {
+      anchor.style.position = "relative";
+    }
+    anchor.appendChild(panel);
+  }
 
   var state = {
     open: false,
@@ -39,14 +78,13 @@
   };
 
   function post(action, params, cb) {
-    // Match project convention: jQuery-style nested params (params[q]=...)
     var parts = ["action=" + encodeURIComponent(action)];
     if (params) {
       Object.keys(params).forEach(function (k) {
         parts.push(
           "params[" + encodeURIComponent(k) + "]=" + encodeURIComponent(params[k])
         );
-      }
+      });
     }
     var xhr = new XMLHttpRequest();
     xhr.open("POST", "ajax.php", true);
@@ -73,7 +111,7 @@
     state.active = 0;
     state.start = -1;
     panel.hidden = true;
-    panel.innerHTML = "";
+    panelBody.innerHTML = "";
   }
 
   function open() {
@@ -134,7 +172,7 @@
       push(u, "最近发言");
     });
     (remote || []).forEach(function (u) {
-      push(u, "前缀匹配");
+      push(u, "用户");
     });
     out.sort(function (a, b) {
       if (a.self === b.self) return 0;
@@ -153,17 +191,17 @@
   }
 
   function renderPanel(prefix) {
+    panelBody.innerHTML = "";
     if (!state.items.length) {
-      panel.innerHTML =
+      panelBody.innerHTML =
         '<div class="mention-empty">' +
         (prefix.length >= MIN_PREFIX
           ? "没有匹配的用户"
-          : "输入用户名，至少 2 个字符可搜索") +
+          : "输入用户名，至少 2 个字符可搜索全站") +
         "</div>";
       open();
       return;
     }
-    panel.innerHTML = "";
     state.items.forEach(function (item, i) {
       var btn = document.createElement("button");
       btn.type = "button";
@@ -171,8 +209,9 @@
         "mention-item" +
         (i === state.active ? " active" : "") +
         (item.self ? " is-self" : "");
+      btn.setAttribute("role", "option");
       btn.innerHTML =
-        '<span class="name">' +
+        '<span class="name">@' +
         markPrefix(item.username, prefix) +
         (item.self ? ' <em class="self-tag">本人</em>' : "") +
         '</span><span class="meta">' +
@@ -188,7 +227,7 @@
           renderPanel(prefix);
         }
       });
-      panel.appendChild(btn);
+      panelBody.appendChild(btn);
     });
     open();
   }
@@ -312,7 +351,7 @@
   input.addEventListener("input", onInput);
   input.addEventListener("keydown", onKeydown);
   input.addEventListener("blur", function () {
-    setTimeout(close, 120);
+    setTimeout(close, 150);
   });
 
   var form = input.form;
