@@ -26,6 +26,7 @@ return [
     ],
 
     'attendance' => [
-        'enabled' => nexus_env('CAPTCHA_ATTENDANCE_ENABLED', true),
+        // 签到验证码：支持 1/0、true/false 等写法，未设置时默认关闭
+        'enabled' => filter_var(nexus_env('CAPTCHA_ATTENDANCE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     ],
 ];
