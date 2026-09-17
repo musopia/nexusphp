@@ -224,6 +224,29 @@ class AjaxInterface{
         $rep = new \App\Repositories\UserPasskeyRepository();
         return $rep->processGet($params['challengeId'], $params['id'], $params['clientDataJSON'], $params['authenticatorData'], $params['signature'], $params['userHandle']);
     }
+
+    /**
+     * @ mention prefix search. params: q
+     */
+    public static function mentionSearch($params)
+    {
+        $q = trim($params['q'] ?? '');
+        return \App\Support\ShoutboxMention::searchPrefix($q);
+    }
+
+    /**
+     * Recent shoutbox speakers for @ empty state.
+     */
+    public static function mentionRecentSpeakers($params)
+    {
+        global $CURUSER;
+        $list = \App\Support\ShoutboxMention::recentSpeakers();
+        $selfId = (int)($CURUSER['id'] ?? 0);
+        foreach ($list as &$item) {
+            $item['self'] = ((int)$item['id'] === $selfId);
+        }
+        return $list;
+    }
 }
 
 $class = 'AjaxInterface';

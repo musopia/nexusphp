@@ -89,6 +89,8 @@ else
 	}
 	$date=sqlesc(time());
 	$text=trim($_GET["shbox_text"]);
+	// @username → (@uid_username)
+	$text = \App\Support\ShoutboxMention::rewriteForStore($text);
     if (isset($userid) && $userid > 0) {
         $lock = new \Nexus\Database\NexusLock("shoutbox:$userid", 60);
     } else {
@@ -136,8 +138,10 @@ else
 		if (isset($CURUSER) && $CURUSER['timetype'] != 'timealive')
 			$time = (new DateTime())->setTimestamp($arr["date"])->format('m.d H:i');
 		else $time = get_elapsed_time($arr["date"]).$lang_shoutbox['text_ago'];
+		$body = format_comment($arr["text"],true,false,true,true,600,false,false);
+		$body = \App\Support\ShoutboxMention::render($body, isset($CURUSER) ? (int)$CURUSER['id'] : null);
 		print("<tr><td class=\"shoutrow\"><span class='date'>[".$time."]</span> ".
-$del ." ". $username." " . format_comment($arr["text"],true,false,true,true,600,false,false)."
+$del ." ". $username." " . $body ."
 </td></tr>\n");
 	}
 	print("</table>");
